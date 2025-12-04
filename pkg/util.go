@@ -43,7 +43,22 @@ func AddrToID(addr string, length int) string {
 // randomTimeout uses time.After to create a timeout between minTimeout and 2x that.
 func randomTimeout(minTimeout time.Duration) <-chan time.Time {
 	// TODO: Students should implement this method
-	return nil
+	// Use crypto/sha1 (already imported) to generate a pseudo-random value
+	// This avoids importing math/rand while still providing randomness
+	h := sha1.New()
+	h.Write([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
+	hashBytes := h.Sum(nil)
+	// Use first 8 bytes to create a random offset
+	var randomInt int64
+	for i := 0; i < 8 && i < len(hashBytes); i++ {
+		randomInt = randomInt<<8 | int64(hashBytes[i])
+	}
+	if randomInt < 0 {
+		randomInt = -randomInt
+	}
+	randomOffset := time.Duration(randomInt % int64(minTimeout))
+	randomDuration := minTimeout + randomOffset
+	return time.After(randomDuration)
 }
 
 // createCacheID creates a unique ID to store a client request and corresponding

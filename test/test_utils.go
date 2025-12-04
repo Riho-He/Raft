@@ -2,9 +2,14 @@ package test
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"time"
+
+	raft "raft/pkg"
+
+	"google.golang.org/grpc/grpclog"
 )
 
 // consts for testing

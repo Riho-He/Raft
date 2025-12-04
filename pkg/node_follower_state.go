@@ -15,12 +15,42 @@ func (n *Node) doFollower() stateFunction {
 	// Hint: perform any initial work, and then consider what a node in the
 	// follower state should do when it receives an incoming message on every
 	// possible channel.
+	electionTimeout := randomTimeout(n.Config.ElectionTimeout)
 	for {
 		select {
 		case shutdown := <-n.gracefulExit:
 			if shutdown {
 				return nil
 			}
+		case msg := <-n.appendEntries:
+			resetTimeout, fallback := n.handleAppendEntries(msg)
+			if fallback {
+				// Already a follower, but reset timeout if needed
+				if resetTimeout {
+					electionTimeout = randomTimeout(n.Config.ElectionTimeout)
+				}
+			}
+		case msg := <-n.requestVote:
+			fallback := n.handleRequestVote(msg)
+			if fallback {
+				// Should become follower, but we're already a follower
+				// Reset election timeout since we received a valid vote request
+				electionTimeout = randomTimeout(n.Config.ElectionTimeout)
+			}
+		case msg := <-n.clientRequest:
+			// Follower cannot handle client requests, redirect to leader
+			leader := n.getLeader()
+			reply := ClientReply{
+				Status:     ClientStatus_NOT_LEADER,
+				ClientId:   msg.request.ClientId,
+				Response:   nil,
+				LeaderHint: leader,
+			}
+			msg.reply <- reply
+		case <-electionTimeout:
+			// Election timeout, become candidate
+			n.Out("Election timeout, becoming candidate")
+			return n.doCandidate
 		}
 	}
 }
